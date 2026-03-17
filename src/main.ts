@@ -6,12 +6,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
   app.enableCors({
-    origin: [
-      'https://mini-app-frontend-pi.vercel.app',
-      'http://localhost:5173',
-    ],
+    origin: '*',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
-    credentials: true,
+    credentials: false,
   })
 
   app.useGlobalPipes(new ValidationPipe())
