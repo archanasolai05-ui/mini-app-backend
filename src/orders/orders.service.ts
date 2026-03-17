@@ -13,7 +13,7 @@ export class OrdersService {
 
   // ─── USER: Place order ────────────────────────────────
   async create(userId: number, dto: CreateOrderDto) {
-    // Step 1: Validate all menu items exist
+    // Step 1: Validate all menu items
     const menuItems = await Promise.all(
       dto.items.map(async (item) => {
         const menuItem = await this.prisma.menuItem.findUnique({
@@ -38,9 +38,10 @@ export class OrdersService {
       return sum + item.menuItem.price * item.quantity;
     }, 0);
 
-    // ✅ Step 3: If tableId provided → conflict check + auto-create booking
+    // Step 3: If tableId provided → conflict check + auto create booking
+    let bookingId: number | undefined = undefined;
+
     if (dto.tableId) {
-      // Check table exists
       const table = await this.prisma.table.findUnique({
         where: { id: dto.tableId },
       });
@@ -53,8 +54,8 @@ export class OrdersService {
         throw new BadRequestException('Table is not available');
       }
 
-      // Only check conflict if date + timeSlot provided
       if (dto.date && dto.timeSlot) {
+        // Check conflict
         const existingBooking = await this.prisma.booking.findFirst({
           where: {
             tableId:  dto.tableId,
@@ -70,8 +71,8 @@ export class OrdersService {
           );
         }
 
-        // ✅ Auto-create booking so it appears in My Bookings
-        await this.prisma.booking.create({
+        // ✅ Create booking and capture its id
+        const booking = await this.prisma.booking.create({
           data: {
             userId,
             tableId:    dto.tableId,
@@ -81,15 +82,19 @@ export class OrdersService {
             status:     'CONFIRMED',
           },
         });
+
+        bookingId = booking.id;
       }
     }
 
-    // Step 4: Create order with items
+    // Step 4: Create order — link to booking if exists
     const order = await this.prisma.order.create({
       data: {
         userId,
-        tableId:    dto.tableId,
+        tableId:   dto.tableId,
         totalPrice,
+        // ✅ Link order to booking
+        ...(bookingId && { bookingId }),
         items: {
           create: menuItems.map(({ menuItem, quantity }) => ({
             menuItemId: menuItem.id,
@@ -100,9 +105,7 @@ export class OrdersService {
       },
       include: {
         items: {
-          include: {
-            menuItem: true,
-          },
+          include: { menuItem: true },
         },
         user: {
           select: {
@@ -111,6 +114,8 @@ export class OrdersService {
             email: true,
           },
         },
+        // ✅ Include booking in response
+        booking: true,
       },
     });
 
@@ -126,10 +131,9 @@ export class OrdersService {
       where: { userId },
       include: {
         items: {
-          include: {
-            menuItem: true,
-          },
+          include: { menuItem: true },
         },
+        booking: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -141,10 +145,9 @@ export class OrdersService {
       where: { id: orderId },
       include: {
         items: {
-          include: {
-            menuItem: true,
-          },
+          include: { menuItem: true },
         },
+        booking: true,
       },
     });
 
@@ -153,9 +156,7 @@ export class OrdersService {
     }
 
     if (order.userId !== userId) {
-      throw new BadRequestException(
-        'You can only view your own orders',
-      );
+      throw new BadRequestException('You can only view your own orders');
     }
 
     return order;
@@ -166,9 +167,7 @@ export class OrdersService {
     return this.prisma.order.findMany({
       include: {
         items: {
-          include: {
-            menuItem: true,
-          },
+          include: { menuItem: true },
         },
         user: {
           select: {
@@ -178,6 +177,7 @@ export class OrdersService {
             phone: true,
           },
         },
+        booking: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -185,7 +185,6 @@ export class OrdersService {
 
   // ─── ADMIN: Create order on behalf of user ────────────
   async adminCreate(dto: AdminOrderDto) {
-    // Check user exists
     const user = await this.prisma.user.findUnique({
       where: { id: dto.userId },
     });
@@ -194,7 +193,6 @@ export class OrdersService {
       throw new NotFoundException('User not found');
     }
 
-    // Validate all menu items
     const menuItems = await Promise.all(
       dto.items.map(async (item) => {
         const menuItem = await this.prisma.menuItem.findUnique({
@@ -214,12 +212,10 @@ export class OrdersService {
       }),
     );
 
-    // Calculate total price
     const totalPrice = menuItems.reduce((sum, item) => {
       return sum + item.menuItem.price * item.quantity;
     }, 0);
 
-    // Create order
     const order = await this.prisma.order.create({
       data: {
         userId:         dto.userId,
@@ -236,9 +232,7 @@ export class OrdersService {
       },
       include: {
         items: {
-          include: {
-            menuItem: true,
-          },
+          include: { menuItem: true },
         },
         user: {
           select: {

@@ -11,9 +11,8 @@ import { AdminBookingDto } from './dto/admin-booking.dto';
 export class BookingsService {
   constructor(private prisma: PrismaService) {}
 
-  // ─── USER: Book a table ──────────────────────────────
+  // ─── USER: Book a table ───────────────────────────────
   async create(userId: number, dto: CreateBookingDto) {
-    // Step 1: Check table exists
     const table = await this.prisma.table.findUnique({
       where: { id: dto.tableId },
     });
@@ -22,12 +21,10 @@ export class BookingsService {
       throw new NotFoundException('Table not found');
     }
 
-    // Step 2: Check table is available
     if (!table.isAvailable) {
       throw new BadRequestException('Table is not available');
     }
 
-    // Step 3: Check if table already booked for same date & timeSlot
     const existingBooking = await this.prisma.booking.findFirst({
       where: {
         tableId:  dto.tableId,
@@ -43,14 +40,12 @@ export class BookingsService {
       );
     }
 
-    // Step 4: Check guest count fits table capacity
     if (dto.guestCount > table.capacity) {
       throw new BadRequestException(
         `Table capacity is ${table.capacity} but you requested ${dto.guestCount} guests`,
       );
     }
 
-    // Step 5: Create booking
     const booking = await this.prisma.booking.create({
       data: {
         userId,
@@ -83,39 +78,54 @@ export class BookingsService {
       where: { userId },
       include: {
         table: true,
+        // ✅ Include linked order
+        order: {
+          include: {
+            items: {
+              include: { menuItem: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  // ─── USER: Cancel own booking ─────────────────────────
+  // ─── USER: Cancel booking → also cancel linked order ──
   async cancelBooking(userId: number, bookingId: number) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
+      include: { order: true }, // ✅ Include linked order
     });
 
     if (!booking) {
       throw new NotFoundException('Booking not found');
     }
 
-    // User can only cancel their own booking
     if (booking.userId !== userId) {
-      throw new BadRequestException(
-        'You can only cancel your own booking',
-      );
+      throw new BadRequestException('You can only cancel your own booking');
     }
 
     if (booking.status === 'CANCELLED') {
       throw new BadRequestException('Booking already cancelled');
     }
 
+    // ✅ Cancel the booking
     const updated = await this.prisma.booking.update({
       where: { id: bookingId },
       data:  { status: 'CANCELLED' },
     });
 
+    // ✅ Cancel linked order too if exists
+    if (booking.order) {
+      await this.prisma.order.update({
+        where: { id: booking.order.id },
+        data:  { status: 'CANCELLED' },
+      });
+    }
+
     return {
-      message: 'Booking cancelled successfully',
+      message: 'Booking and linked order cancelled successfully',
       booking: updated,
     };
   }
@@ -133,6 +143,7 @@ export class BookingsService {
             phone: true,
           },
         },
+        order: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -140,7 +151,6 @@ export class BookingsService {
 
   // ─── ADMIN: Create booking on behalf of user ──────────
   async adminCreate(dto: AdminBookingDto) {
-    // Check user exists
     const user = await this.prisma.user.findUnique({
       where: { id: dto.userId },
     });
@@ -149,7 +159,6 @@ export class BookingsService {
       throw new NotFoundException('User not found');
     }
 
-    // Check table exists
     const table = await this.prisma.table.findUnique({
       where: { id: dto.tableId },
     });
@@ -158,14 +167,12 @@ export class BookingsService {
       throw new NotFoundException('Table not found');
     }
 
-    // Check table capacity
     if (dto.guestCount > table.capacity) {
       throw new BadRequestException(
         `Table capacity is ${table.capacity} but you requested ${dto.guestCount} guests`,
       );
     }
 
-    // Check already booked
     const existingBooking = await this.prisma.booking.findFirst({
       where: {
         tableId:  dto.tableId,
@@ -181,16 +188,15 @@ export class BookingsService {
       );
     }
 
-    // Create booking with createdByAdmin flag
     const booking = await this.prisma.booking.create({
       data: {
-        userId:        dto.userId,
-        tableId:       dto.tableId,
-        date:          new Date(dto.date),
-        timeSlot:      dto.timeSlot,
-        guestCount:    dto.guestCount,
+        userId:         dto.userId,
+        tableId:        dto.tableId,
+        date:           new Date(dto.date),
+        timeSlot:       dto.timeSlot,
+        guestCount:     dto.guestCount,
         createdByAdmin: true,
-        status:        'CONFIRMED',
+        status:         'CONFIRMED',
       },
       include: {
         table: true,
@@ -217,6 +223,7 @@ export class BookingsService {
   ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
+      include: { order: true }, // ✅ Include linked order
     });
 
     if (!booking) {
@@ -227,6 +234,14 @@ export class BookingsService {
       where: { id: bookingId },
       data:  { status },
     });
+
+    // ✅ If admin cancels booking → also cancel linked order
+    if (status === 'CANCELLED' && booking.order) {
+      await this.prisma.order.update({
+        where: { id: booking.order.id },
+        data:  { status: 'CANCELLED' },
+      });
+    }
 
     return {
       message: `Booking ${status.toLowerCase()} successfully`,

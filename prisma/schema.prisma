@@ -7,6 +7,7 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
 enum Role {
   ADMIN
   USER
@@ -70,6 +71,10 @@ model Booking {
   status         BookingStatus @default(PENDING)
   createdByAdmin Boolean       @default(false)
   createdAt      DateTime      @default(now())
+
+  // ✅ Link to Order
+  order          Order?        @relation("BookingOrder")
+
   user           User          @relation(fields: [userId], references: [id])
   table          Table         @relation(fields: [tableId], references: [id])
 }
@@ -82,6 +87,11 @@ model Order {
   totalPrice     Float
   createdByAdmin Boolean     @default(false)
   createdAt      DateTime    @default(now())
+
+  // ✅ Link to Booking
+  bookingId      Int?        @unique
+  booking        Booking?    @relation("BookingOrder", fields: [bookingId], references: [id])
+
   user           User        @relation(fields: [userId], references: [id])
   items          OrderItem[]
 }

@@ -46,8 +46,8 @@ export class TablesService {
     const table = await this.prisma.table.create({
       data: {
         tableNumber: dto.tableNumber,
-        capacity: dto.capacity,
-        location: dto.location,
+        capacity:    dto.capacity,
+        location:    dto.location,
         isAvailable: dto.isAvailable ?? true,
       },
     });
@@ -59,10 +59,39 @@ export class TablesService {
 
   async update(id: number, dto: UpdateTableDto) {
     await this.findOne(id);
+
+    // ✅ If marked unavailable → cancel all active bookings + linked orders
+    if (dto.isAvailable === false) {
+      const activeBookings = await this.prisma.booking.findMany({
+        where: {
+          tableId: id,
+          status: { in: ['PENDING', 'CONFIRMED'] },
+        },
+        include: { order: true },
+      });
+
+      for (const booking of activeBookings) {
+        // Cancel booking
+        await this.prisma.booking.update({
+          where: { id: booking.id },
+          data:  { status: 'CANCELLED' },
+        });
+
+        // ✅ Cancel linked order too
+        if (booking.order) {
+          await this.prisma.order.update({
+            where: { id: booking.order.id },
+            data:  { status: 'CANCELLED' },
+          });
+        }
+      }
+    }
+
     const table = await this.prisma.table.update({
       where: { id },
-      data: dto,
+      data:  dto,
     });
+
     return {
       message: 'Table updated successfully',
       table,

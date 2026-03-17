@@ -4,7 +4,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthGuard } from '@nestjs/passport';
 
-@Controller('auth')
+@Controller('auth')   //base route for all auth-related endpoints
 export class AuthController {
   constructor(private authService: AuthService) {}
 
