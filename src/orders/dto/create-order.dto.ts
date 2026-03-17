@@ -10,7 +10,8 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-class OrderItemDto {
+// ✅ Add "export" here — that's the only fix
+export class OrderItemDto {
   @IsInt()
   menuItemId: number;
 
@@ -30,14 +31,13 @@ export class CreateOrderDto {
   @IsInt()
   tableId?: number;
 
-  // ✅ NEW — for booking conflict check
   @IsOptional()
   @IsDateString()
-  date?: string;        // e.g. "2026-03-18"
+  date?: string;
 
   @IsOptional()
   @IsString()
-  timeSlot?: string;    // e.g. "11:00 AM - 1:00 PM"
+  timeSlot?: string;
 
   @IsOptional()
   @IsInt()
