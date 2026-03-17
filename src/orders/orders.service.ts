@@ -38,7 +38,53 @@ export class OrdersService {
       return sum + item.menuItem.price * item.quantity;
     }, 0);
 
-    // Step 3: Create order with items
+    // ✅ Step 3: If tableId provided → conflict check + auto-create booking
+    if (dto.tableId) {
+      // Check table exists
+      const table = await this.prisma.table.findUnique({
+        where: { id: dto.tableId },
+      });
+
+      if (!table) {
+        throw new NotFoundException('Table not found');
+      }
+
+      if (!table.isAvailable) {
+        throw new BadRequestException('Table is not available');
+      }
+
+      // Only check conflict if date + timeSlot provided
+      if (dto.date && dto.timeSlot) {
+        const existingBooking = await this.prisma.booking.findFirst({
+          where: {
+            tableId:  dto.tableId,
+            date:     new Date(dto.date),
+            timeSlot: dto.timeSlot,
+            status:   { not: 'CANCELLED' },
+          },
+        });
+
+        if (existingBooking) {
+          throw new BadRequestException(
+            'Table already booked for this date and time slot',
+          );
+        }
+
+        // ✅ Auto-create booking so it appears in My Bookings
+        await this.prisma.booking.create({
+          data: {
+            userId,
+            tableId:    dto.tableId,
+            date:       new Date(dto.date),
+            timeSlot:   dto.timeSlot,
+            guestCount: dto.guestCount ?? 1,
+            status:     'CONFIRMED',
+          },
+        });
+      }
+    }
+
+    // Step 4: Create order with items
     const order = await this.prisma.order.create({
       data: {
         userId,
@@ -48,7 +94,7 @@ export class OrdersService {
           create: menuItems.map(({ menuItem, quantity }) => ({
             menuItemId: menuItem.id,
             quantity,
-            price: menuItem.price,
+            price:      menuItem.price,
           })),
         },
       },
@@ -176,15 +222,15 @@ export class OrdersService {
     // Create order
     const order = await this.prisma.order.create({
       data: {
-        userId:        dto.userId,
-        tableId:       dto.tableId,
+        userId:         dto.userId,
+        tableId:        dto.tableId,
         totalPrice,
         createdByAdmin: true,
         items: {
           create: menuItems.map(({ menuItem, quantity }) => ({
             menuItemId: menuItem.id,
             quantity,
-            price: menuItem.price,
+            price:      menuItem.price,
           })),
         },
       },
@@ -230,7 +276,7 @@ export class OrdersService {
 
     return {
       message: `Order status updated to ${status}`,
-      order: updated,
+      order:   updated,
     };
   }
 }
