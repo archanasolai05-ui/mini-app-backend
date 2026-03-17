@@ -5,16 +5,15 @@ import { ValidationPipe } from '@nestjs/common'
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
 
-  // Enable CORS for frontend
   app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: 'https://mini-app-frontend-pi.vercel.app',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'PUT'],
     credentials: true,
   })
 
   app.useGlobalPipes(new ValidationPipe())
 
-  await app.listen(3000)
+  await app.listen(process.env.PORT ?? 3000)
   console.log('Backend running on http://localhost:3000 🚀')
 }
 bootstrap()
