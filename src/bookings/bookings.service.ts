@@ -95,7 +95,7 @@ export class BookingsService {
   async cancelBooking(userId: number, bookingId: number) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { order: true }, // ✅ Include linked order
+      include: { order: true },
     });
 
     if (!booking) {
@@ -143,7 +143,15 @@ export class BookingsService {
             phone: true,
           },
         },
-        order: true,
+        // ✅ ONLY CHANGE HERE — was: order: true
+        // now includes items and menuItem inside order
+        order: {
+          include: {
+            items: {
+              include: { menuItem: true },
+            },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -223,7 +231,7 @@ export class BookingsService {
   ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { order: true }, // ✅ Include linked order
+      include: { order: true },
     });
 
     if (!booking) {
