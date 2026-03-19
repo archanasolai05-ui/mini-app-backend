@@ -15,24 +15,35 @@ import { UpdateMenuDto } from './dto/update-menu.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+// ✅ ADD this import line only
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
+// ✅ ADD these 2 lines only
+@ApiTags('Menu')
 @Controller('menu')
 export class MenuController {
   constructor(private menuService: MenuService) {}
 
   // GET /menu → anyone can view
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Get all menu items' })
   @Get()
   findAll() {
     return this.menuService.findAll();
   }
 
   // GET /menu/:id → anyone can view
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Get single menu item by id' })
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.menuService.findOne(id);
   }
 
   // POST /menu → admin only
+  // ✅ ADD these 2 lines only
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create menu item — ADMIN only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @Post()
@@ -41,6 +52,9 @@ export class MenuController {
   }
 
   // PATCH /menu/:id → admin only
+  // ✅ ADD these 2 lines only
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update menu item — ADMIN only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @Patch(':id')
@@ -52,6 +66,9 @@ export class MenuController {
   }
 
   // DELETE /menu/:id → admin only
+  // ✅ ADD these 2 lines only
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete menu item — ADMIN only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @Delete(':id')
@@ -59,19 +76,3 @@ export class MenuController {
     return this.menuService.remove(id);
   }
 }
-// ```
-
-// ### Controller Flow Explanation:
-// ```
-// @Controller('menu')     → base URL is /menu
-// @Get()                  → GET /menu
-// @Get(':id')             → GET /menu/1
-// @Post()                 → POST /menu
-// @Patch(':id')           → PATCH /menu/1
-// @Delete(':id')          → DELETE /menu/1
-
-// @UseGuards(AuthGuard)   → must be logged in
-// @UseGuards(RolesGuard)  → must be correct role
-// @Roles('ADMIN')         → only admin allowed
-
-// ParseIntPipe            → converts "1" string to 1 number

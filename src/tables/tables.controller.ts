@@ -15,12 +15,19 @@ import { UpdateTableDto } from './dto/update-table.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+// ✅ ADD this import line only
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
+// ✅ ADD these 2 lines only
+@ApiTags('Tables')
+@ApiBearerAuth()
 @Controller('tables')
 export class TablesController {
   constructor(private tablesService: TablesService) {}
 
   // GET /tables → both admin and user
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Get all tables' })
   @UseGuards(AuthGuard('jwt'))
   @Get()
   findAll() {
@@ -28,6 +35,8 @@ export class TablesController {
   }
 
   // GET /tables/available → user sees available tables
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Get available tables only' })
   @UseGuards(AuthGuard('jwt'))
   @Get('available')
   findAvailable() {
@@ -35,6 +44,8 @@ export class TablesController {
   }
 
   // GET /tables/:id → both admin and user
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Get single table by id' })
   @UseGuards(AuthGuard('jwt'))
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -42,6 +53,8 @@ export class TablesController {
   }
 
   // POST /tables → admin only
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Create new table — ADMIN only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @Post()
@@ -50,6 +63,8 @@ export class TablesController {
   }
 
   // PATCH /tables/:id → admin only
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Update table — ADMIN only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @Patch(':id')
@@ -61,6 +76,8 @@ export class TablesController {
   }
 
   // DELETE /tables/:id → admin only
+  // ✅ ADD this 1 line only
+  @ApiOperation({ summary: 'Delete table — ADMIN only' })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
   @Delete(':id')
