@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
-import { AdminBookingDto } from './dto/admin-booking.dto';
 
 @Injectable()
 export class BookingsService {
@@ -78,7 +77,6 @@ export class BookingsService {
       where: { userId },
       include: {
         table: true,
-        // ✅ Include linked order
         order: {
           include: {
             items: {
@@ -95,7 +93,7 @@ export class BookingsService {
   async cancelBooking(userId: number, bookingId: number) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { order: true }, // ✅ Include linked order
+      include: { order: true },
     });
 
     if (!booking) {
@@ -110,13 +108,11 @@ export class BookingsService {
       throw new BadRequestException('Booking already cancelled');
     }
 
-    // ✅ Cancel the booking
     const updated = await this.prisma.booking.update({
       where: { id: bookingId },
       data:  { status: 'CANCELLED' },
     });
 
-    // ✅ Cancel linked order too if exists
     if (booking.order) {
       await this.prisma.order.update({
         where: { id: booking.order.id },
@@ -149,73 +145,6 @@ export class BookingsService {
     });
   }
 
-  // ─── ADMIN: Create booking on behalf of user ──────────
-  async adminCreate(dto: AdminBookingDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: dto.userId },
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    const table = await this.prisma.table.findUnique({
-      where: { id: dto.tableId },
-    });
-
-    if (!table) {
-      throw new NotFoundException('Table not found');
-    }
-
-    if (dto.guestCount > table.capacity) {
-      throw new BadRequestException(
-        `Table capacity is ${table.capacity} but you requested ${dto.guestCount} guests`,
-      );
-    }
-
-    const existingBooking = await this.prisma.booking.findFirst({
-      where: {
-        tableId:  dto.tableId,
-        date:     new Date(dto.date),
-        timeSlot: dto.timeSlot,
-        status:   { not: 'CANCELLED' },
-      },
-    });
-
-    if (existingBooking) {
-      throw new BadRequestException(
-        'Table already booked for this date and time slot',
-      );
-    }
-
-    const booking = await this.prisma.booking.create({
-      data: {
-        userId:         dto.userId,
-        tableId:        dto.tableId,
-        date:           new Date(dto.date),
-        timeSlot:       dto.timeSlot,
-        guestCount:     dto.guestCount,
-        createdByAdmin: true,
-        status:         'CONFIRMED',
-      },
-      include: {
-        table: true,
-        user: {
-          select: {
-            id:    true,
-            name:  true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    return {
-      message: 'Booking created successfully on behalf of user',
-      booking,
-    };
-  }
-
   // ─── ADMIN: Update booking status ────────────────────
   async updateStatus(
     bookingId: number,
@@ -223,7 +152,7 @@ export class BookingsService {
   ) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { order: true }, // ✅ Include linked order
+      include: { order: true },
     });
 
     if (!booking) {
@@ -235,7 +164,6 @@ export class BookingsService {
       data:  { status },
     });
 
-    // ✅ If admin cancels booking → also cancel linked order
     if (status === 'CANCELLED' && booking.order) {
       await this.prisma.order.update({
         where: { id: booking.order.id },

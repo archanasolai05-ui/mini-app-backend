@@ -1,5 +1,4 @@
 import { IsNumber, IsString, IsDateString } from 'class-validator';
-// ✅ ADD this import line only
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateBookingDto {
